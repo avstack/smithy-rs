@@ -9,7 +9,6 @@ import software.amazon.smithy.aws.traits.protocols.RestJson1Trait
 import software.amazon.smithy.aws.traits.protocols.RestXmlTrait
 import software.amazon.smithy.codegen.core.Symbol
 import software.amazon.smithy.model.knowledge.HttpBindingIndex
-import software.amazon.smithy.model.knowledge.NullableIndex
 import software.amazon.smithy.model.node.ExpectationNotMetException
 import software.amazon.smithy.model.shapes.CollectionShape
 import software.amazon.smithy.model.shapes.OperationShape
@@ -104,7 +103,6 @@ private class ServerHttpProtocolImplGenerator(
     val httpBindingResolver = protocol.httpBindingResolver
     private val operationDeserModule = RustModule.private("operation_deser")
     private val operationSerModule = RustModule.private("operation_ser")
-    private val nullableIndex = NullableIndex.of(model)
 
     private val codegenScope = arrayOf(
         "AsyncTrait" to ServerCargoDependency.AsyncTrait.asType(),
@@ -939,7 +937,7 @@ private class ServerHttpProtocolImplGenerator(
 
     private fun generateParsePercentEncodedStrAsStringFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.config().handleRequired && binding.member.isRequired() || !nullableIndex.isNullable(binding.member)) { "value" } else { "Some(value)" }
+        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         return RuntimeType.forInlineFun(fnName, operationDeserModule) { writer ->
             writer.rustBlockTemplate(
@@ -963,7 +961,7 @@ private class ServerHttpProtocolImplGenerator(
 
     private fun generateParsePercentEncodedStrAsTimestampFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.config().handleRequired && binding.member.isRequired() || !nullableIndex.isNullable(binding.member)) { "value" } else { "Some(value)" }
+        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         val index = HttpBindingIndex.of(model)
         val timestampFormat =
@@ -995,7 +993,7 @@ private class ServerHttpProtocolImplGenerator(
     // TODO These functions can be replaced with the ones in https://docs.rs/aws-smithy-types/latest/aws_smithy_types/primitive/trait.Parse.html
     private fun generateParseStrAsPrimitiveFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.config().handleRequired && binding.member.isRequired() || !nullableIndex.isNullable(binding.member)) { "value" } else { "Some(value)" }
+        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         return RuntimeType.forInlineFun(fnName, operationDeserModule) { writer ->
             writer.rustBlockTemplate(
