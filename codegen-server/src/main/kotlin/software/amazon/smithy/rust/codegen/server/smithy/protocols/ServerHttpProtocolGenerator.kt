@@ -11,6 +11,7 @@ import software.amazon.smithy.codegen.core.Symbol
 import software.amazon.smithy.model.knowledge.HttpBindingIndex
 import software.amazon.smithy.model.node.ExpectationNotMetException
 import software.amazon.smithy.model.shapes.CollectionShape
+import software.amazon.smithy.model.shapes.MemberShape
 import software.amazon.smithy.model.shapes.OperationShape
 import software.amazon.smithy.model.shapes.Shape
 import software.amazon.smithy.model.shapes.StringShape
@@ -937,7 +938,6 @@ private class ServerHttpProtocolImplGenerator(
 
     private fun generateParsePercentEncodedStrAsStringFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         return RuntimeType.forInlineFun(fnName, operationDeserModule) { writer ->
             writer.rustBlockTemplate(
@@ -951,7 +951,7 @@ private class ServerHttpProtocolImplGenerator(
                 rustTemplate(
                     """
                     let value = <_>::from(#{PercentEncoding}::percent_decode_str(value).decode_utf8()?.as_ref());
-                    Ok($returnVal)
+                    Ok(${getReturnTypeForMember(binding.member)})
                     """.trimIndent(),
                     *codegenScope,
                 )
@@ -961,7 +961,6 @@ private class ServerHttpProtocolImplGenerator(
 
     private fun generateParsePercentEncodedStrAsTimestampFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         val index = HttpBindingIndex.of(model)
         val timestampFormat =
@@ -981,7 +980,7 @@ private class ServerHttpProtocolImplGenerator(
                     """
                     let value = #{PercentEncoding}::percent_decode_str(value).decode_utf8()?;
                     let value = #{DateTime}::from_str(&value, #{format})?;
-                    Ok($returnVal)
+                    Ok(${getReturnTypeForMember(binding.member)})
                     """.trimIndent(),
                     *codegenScope,
                     "format" to timestampFormatType,
@@ -993,7 +992,6 @@ private class ServerHttpProtocolImplGenerator(
     // TODO These functions can be replaced with the ones in https://docs.rs/aws-smithy-types/latest/aws_smithy_types/primitive/trait.Parse.html
     private fun generateParseStrAsPrimitiveFn(binding: HttpBindingDescriptor): RuntimeType {
         val output = symbolProvider.toSymbol(binding.member)
-        val returnVal = if (symbolProvider.handleRequired(binding.member)) { "value" } else { "Some(value)" }
         val fnName = generateParseStrFnName(binding)
         return RuntimeType.forInlineFun(fnName, operationDeserModule) { writer ->
             writer.rustBlockTemplate(
@@ -1004,7 +1002,7 @@ private class ServerHttpProtocolImplGenerator(
                 rustTemplate(
                     """
                     let value = std::str::FromStr::from_str(value)?;
-                    Ok($returnVal)
+                    Ok(${getReturnTypeForMember(binding.member)})
                     """.trimIndent(),
                     *codegenScope,
                 )
@@ -1047,5 +1045,9 @@ private class ServerHttpProtocolImplGenerator(
                 TODO("Protocol ${codegenContext.protocol} not supported yet")
             }
         }
+    }
+
+    private fun getReturnTypeForMember(member: MemberShape): String {
+        return if (symbolProvider.isRequiredTraitHandled(member)) { "value" } else { "Some(value)" }
     }
 }
